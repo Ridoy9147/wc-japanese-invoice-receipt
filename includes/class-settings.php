@@ -3,6 +3,7 @@
  * Settings Page Handler for WooCommerce Japanese Invoice & Receipt
  *
  * Integrates directly into WooCommerce > Settings > 納品書・領収書
+ * Includes WordPress Media Uploader for Header Logo and Watermark Logo.
  *
  * @package WC_Japanese_Invoice_Receipt
  */
@@ -17,6 +18,11 @@ class WC_JIR_Settings {
         add_filter( 'woocommerce_settings_tabs_array', array( __CLASS__, 'add_settings_tab' ), 50 );
         add_action( 'woocommerce_settings_tabs_wc_jir_settings', array( __CLASS__, 'settings_tab' ) );
         add_action( 'woocommerce_update_options_wc_jir_settings', array( __CLASS__, 'update_settings' ) );
+
+        // Custom field type for Media Library Image Uploader
+        add_action( 'woocommerce_admin_field_wc_jir_image_uploader', array( __CLASS__, 'render_image_uploader_field' ) );
+        add_action( 'woocommerce_update_option_wc_jir_image_uploader', array( __CLASS__, 'save_image_uploader_field' ) );
+
         add_action( 'admin_enqueue_scripts', array( __CLASS__, 'enqueue_media_uploader' ) );
     }
 
@@ -36,12 +42,106 @@ class WC_JIR_Settings {
     public static function enqueue_media_uploader( $hook ) {
         if ( isset( $_GET['page'], $_GET['tab'] ) && 'wc-settings' === $_GET['page'] && 'wc_jir_settings' === $_GET['tab'] ) {
             wp_enqueue_media();
+            add_action( 'admin_footer', array( __CLASS__, 'render_media_script' ) );
+        }
+    }
+
+    /**
+     * Inline JS for WordPress Media Library dialog.
+     */
+    public static function render_media_script() {
+        ?>
+        <script>
+        jQuery(document).ready(function($) {
+            $(document).on('click', '.wc-jir-upload-btn', function(e) {
+                e.preventDefault();
+                var $btn = $(this);
+                var targetId = $btn.data('target');
+                var dialogTitle = $btn.data('title') || '画像を選択';
+
+                var frame = wp.media({
+                    title: dialogTitle,
+                    button: { text: 'この画像を使用' },
+                    multiple: false,
+                    library: { type: 'image' }
+                });
+
+                frame.on('select', function() {
+                    var attachment = frame.state().get('selection').first().toJSON();
+                    $('#' + targetId).val(attachment.url);
+                    var $wrap = $('#' + targetId + '_wrap');
+                    $wrap.find('.wc-jir-preview-box img').attr('src', attachment.url);
+                    $wrap.find('.wc-jir-preview-box').show();
+                    $wrap.find('.wc-jir-remove-btn').show();
+                });
+
+                frame.open();
+            });
+
+            $(document).on('click', '.wc-jir-remove-btn', function(e) {
+                e.preventDefault();
+                var targetId = $(this).data('target');
+                $('#' + targetId).val('');
+                var $wrap = $('#' + targetId + '_wrap');
+                $wrap.find('.wc-jir-preview-box img').attr('src', '');
+                $wrap.find('.wc-jir-preview-box').hide();
+                $(this).hide();
+            });
+        });
+        </script>
+        <?php
+    }
+
+    /**
+     * Render the Custom Image Uploader Field in WooCommerce Settings.
+     */
+    public static function render_image_uploader_field( $value ) {
+        $option_value = get_option( $value['id'], $value['default'] ?? '' );
+        ?>
+        <tr valign="top">
+            <th scope="row" class="titledesc">
+                <label for="<?php echo esc_attr( $value['id'] ); ?>"><?php echo esc_html( $value['title'] ); ?></label>
+                <?php echo wc_help_tip( $value['desc'] ?? '' ); ?>
+            </th>
+            <td class="forminp forminp-wc-jir-image-uploader">
+                <div class="wc-jir-image-uploader-wrap" id="<?php echo esc_attr( $value['id'] ); ?>_wrap">
+                    <input type="hidden" name="<?php echo esc_attr( $value['id'] ); ?>" id="<?php echo esc_attr( $value['id'] ); ?>" value="<?php echo esc_attr( $option_value ); ?>">
+
+                    <div class="wc-jir-preview-box" style="margin-bottom: 10px; <?php echo empty( $option_value ) ? 'display:none;' : ''; ?>">
+                        <img src="<?php echo esc_url( $option_value ); ?>" style="max-height: 90px; max-width: 260px; object-fit: contain; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 6px; background: #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,.06);" alt="Preview">
+                    </div>
+
+                    <div style="display:flex; gap:10px; align-items:center;">
+                        <button type="button" class="button button-secondary wc-jir-upload-btn" data-target="<?php echo esc_attr( $value['id'] ); ?>" data-title="<?php echo esc_attr( $value['title'] ); ?>">
+                            <span class="dashicons dashicons-upload" style="vertical-align:middle; margin-top:-2px;"></span>
+                            <?php esc_html_e( '画像を選択 / アップロード (Select Image)', 'wc-japanese-invoice-receipt' ); ?>
+                        </button>
+                        <button type="button" class="button button-link-delete wc-jir-remove-btn" data-target="<?php echo esc_attr( $value['id'] ); ?>" style="<?php echo empty( $option_value ) ? 'display:none;' : ''; ?> color:#dc2626; text-decoration:none;">
+                            <?php esc_html_e( '削除 (Remove)', 'wc-japanese-invoice-receipt' ); ?>
+                        </button>
+                    </div>
+
+                    <?php if ( ! empty( $value['desc'] ) ) : ?>
+                        <p class="description" style="margin-top:6px;"><?php echo esc_html( $value['desc'] ); ?></p>
+                    <?php endif; ?>
+                </div>
+            </td>
+        </tr>
+        <?php
+    }
+
+    /**
+     * Save the Custom Image Uploader Field.
+     */
+    public static function save_image_uploader_field( $value ) {
+        if ( isset( $_POST[ $value['id'] ] ) ) {
+            update_option( $value['id'], esc_url_raw( wp_unslash( $_POST[ $value['id'] ] ) ) );
         }
     }
 
     public static function get_settings() {
         $settings = array(
-            'section_title' => array(
+            'section_store' => array(
                 'name'     => __( '店舗・事業者情報 (Store & Seller Information)', 'wc-japanese-invoice-receipt' ),
                 'type'     => 'title',
                 'desc'     => __( '納品書および領収書に印字される店舗情報と適格請求書（インボイス）登録番号を設定します。', 'wc-japanese-invoice-receipt' ),
@@ -85,10 +185,56 @@ class WC_JIR_Settings {
                 'id'   => 'wc_jir_section_store_end',
             ),
 
+            'section_branding' => array(
+                'name'     => __( 'ロゴ＆ウォーターマーク設定 (Logo & Watermark)', 'wc-japanese-invoice-receipt' ),
+                'type'     => 'title',
+                'desc'     => __( '納品書のヘッダーロゴおよび中央背景の透かし（ウォーターマーク）ロゴ画像を設定します。メディアライブラリからアップロードまたは選択可能です。', 'wc-japanese-invoice-receipt' ),
+                'id'       => 'wc_jir_section_branding',
+            ),
+            'header_logo_url' => array(
+                'title'    => __( 'ヘッダー用ロゴ画像 (Header Logo)', 'wc-japanese-invoice-receipt' ),
+                'type'     => 'wc_jir_image_uploader',
+                'desc'     => __( '納品書の左上ヘッダーに印字されるロゴ画像です。空欄の場合はサイトのカスタムロゴを自動使用します。', 'wc-japanese-invoice-receipt' ),
+                'id'       => 'wc_jir_header_logo_url',
+                'default'  => '',
+            ),
+            'enable_watermark' => array(
+                'name'     => __( '透かしウォーターマーク (Enable Watermark)', 'wc-japanese-invoice-receipt' ),
+                'type'     => 'checkbox',
+                'desc'     => __( '納品書の中央背景にロゴマークを薄く透かし表示する', 'wc-japanese-invoice-receipt' ),
+                'id'       => 'wc_jir_enable_watermark',
+                'default'  => 'yes',
+            ),
+            'watermark_logo_url' => array(
+                'title'    => __( '透かし専用ロゴ画像 (Watermark Logo - Optional)', 'wc-japanese-invoice-receipt' ),
+                'type'     => 'wc_jir_image_uploader',
+                'desc'     => __( '中央背景に透かしとして表示する専用ロゴです。空欄の場合は上記のヘッダー用ロゴがそのまま使用されます。', 'wc-japanese-invoice-receipt' ),
+                'id'       => 'wc_jir_watermark_logo_url',
+                'default'  => '',
+            ),
+            'watermark_opacity' => array(
+                'name'     => __( '透かしの濃さ・不透明度 (Watermark Opacity)', 'wc-japanese-invoice-receipt' ),
+                'type'     => 'select',
+                'desc'     => __( '背景透かしロゴの薄さ（不透明度）を選択します。', 'wc-japanese-invoice-receipt' ),
+                'id'       => 'wc_jir_watermark_opacity',
+                'options'  => array(
+                    '0.03' => __( '3% (とても薄め - 文字の邪魔をしない推奨)', 'wc-japanese-invoice-receipt' ),
+                    '0.05' => __( '5% (標準 - 最適なバランス / 推奨)', 'wc-japanese-invoice-receipt' ),
+                    '0.08' => __( '8% (ややはっきり)', 'wc-japanese-invoice-receipt' ),
+                    '0.12' => __( '12% (くっきり)', 'wc-japanese-invoice-receipt' ),
+                    '0.18' => __( '18% (濃いめ)', 'wc-japanese-invoice-receipt' ),
+                ),
+                'default'  => '0.05',
+            ),
+            'section_branding_end' => array(
+                'type' => 'sectionend',
+                'id'   => 'wc_jir_section_branding_end',
+            ),
+
             'section_design' => array(
                 'name'     => __( 'デザイン・レイアウト設定 (Layout & Design)', 'wc-japanese-invoice-receipt' ),
                 'type'     => 'title',
-                'desc'     => __( 'A4印刷フォーマットや透かしロゴ、控えの分割方法を設定します。', 'wc-japanese-invoice-receipt' ),
+                'desc'     => __( 'A4印刷フォーマットや控えの分割方法、印鑑枠を設定します。', 'wc-japanese-invoice-receipt' ),
                 'id'       => 'wc_jir_section_design',
             ),
             'doc_title' => array(
@@ -116,21 +262,6 @@ class WC_JIR_Settings {
                 'type'     => 'checkbox',
                 'desc'     => __( '2枚分割時に「— キリトリ線 —」を表示する', 'wc-japanese-invoice-receipt' ),
                 'id'       => 'wc_jir_show_cut_line',
-                'default'  => 'yes',
-            ),
-            'custom_logo_url' => array(
-                'name'     => __( '専用ロゴ画像URL (Custom Logo URL)', 'wc-japanese-invoice-receipt' ),
-                'type'     => 'text',
-                'desc'     => __( '納品書専用のロゴ画像URLを指定できます。（空欄の場合はサイトのカスタムロゴを自動使用します）', 'wc-japanese-invoice-receipt' ),
-                'id'       => 'wc_jir_custom_logo_url',
-                'default'  => '',
-                'css'      => 'min-width:400px;',
-            ),
-            'enable_watermark' => array(
-                'name'     => __( 'ロゴ透かし背景 (Logo Watermark)', 'wc-japanese-invoice-receipt' ),
-                'type'     => 'checkbox',
-                'desc'     => __( '用紙の中央背景にロゴマークを薄く透かし表示（ウォーターマーク）する', 'wc-japanese-invoice-receipt' ),
-                'id'       => 'wc_jir_enable_watermark',
                 'default'  => 'yes',
             ),
             'show_stamp_box' => array(
@@ -183,14 +314,21 @@ class WC_JIR_Settings {
     }
 
     /**
-     * Helper to get effective logo URL (custom option -> theme logo -> placeholder).
+     * Helper to get effective header logo URL.
      */
     public static function get_logo_url() {
-        $custom = get_option( 'wc_jir_custom_logo_url', '' );
+        $custom = get_option( 'wc_jir_header_logo_url', '' );
         if ( ! empty( $custom ) ) {
             return $custom;
         }
 
+        // Backward compatibility
+        $legacy = get_option( 'wc_jir_custom_logo_url', '' );
+        if ( ! empty( $legacy ) ) {
+            return $legacy;
+        }
+
+        // Try WordPress custom logo
         $theme_logo_id = get_theme_mod( 'custom_logo' );
         if ( $theme_logo_id ) {
             $logo_src = wp_get_attachment_image_url( $theme_logo_id, 'full' );
@@ -199,6 +337,32 @@ class WC_JIR_Settings {
             }
         }
 
+        // Try WooCommerce email header image
+        $wc_email_logo = get_option( 'woocommerce_email_header_image' );
+        if ( ! empty( $wc_email_logo ) ) {
+            return $wc_email_logo;
+        }
+
+        // Try site icon (favicon)
+        $site_icon_id = get_option( 'site_icon' );
+        if ( $site_icon_id ) {
+            $site_icon_src = wp_get_attachment_image_url( $site_icon_id, 'full' );
+            if ( $site_icon_src ) {
+                return $site_icon_src;
+            }
+        }
+
         return '';
+    }
+
+    /**
+     * Helper to get effective watermark logo URL.
+     */
+    public static function get_watermark_url() {
+        $watermark_custom = get_option( 'wc_jir_watermark_logo_url', '' );
+        if ( ! empty( $watermark_custom ) ) {
+            return $watermark_custom;
+        }
+        return self::get_logo_url();
     }
 }

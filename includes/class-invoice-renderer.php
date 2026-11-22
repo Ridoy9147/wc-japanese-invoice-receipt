@@ -34,12 +34,14 @@ class WC_JIR_Invoice_Renderer {
             wp_die( esc_html__( '注文が見つかりませんでした。(Order not found)', 'wc-japanese-invoice-receipt' ) );
         }
 
-        $logo_url    = WC_JIR_Settings::get_logo_url();
-        $doc_title   = get_option( 'wc_jir_doc_title', '納品書 兼 領収書' );
-        $watermark   = ( 'yes' === get_option( 'wc_jir_enable_watermark', 'yes' ) && ! empty( $logo_url ) );
-        $layout_opt  = get_option( 'wc_jir_copy_layout', 'dual' );
-        $show_cut    = ( 'yes' === get_option( 'wc_jir_show_cut_line', 'yes' ) );
-        $auto        = $auto_print || ( 'yes' === get_option( 'wc_jir_auto_open_print', 'no' ) );
+        $logo_url          = WC_JIR_Settings::get_logo_url();
+        $watermark_url     = WC_JIR_Settings::get_watermark_url();
+        $watermark_opacity = get_option( 'wc_jir_watermark_opacity', '0.05' );
+        $watermark_enabled = ( 'yes' === get_option( 'wc_jir_enable_watermark', 'yes' ) && ! empty( $watermark_url ) );
+        $doc_title         = get_option( 'wc_jir_doc_title', '納品書 兼 領収書' );
+        $layout_opt        = get_option( 'wc_jir_copy_layout', 'dual' );
+        $show_cut          = ( 'yes' === get_option( 'wc_jir_show_cut_line', 'yes' ) );
+        $auto              = $auto_print || ( 'yes' === get_option( 'wc_jir_auto_open_print', 'no' ) );
 
         $first_order = reset( $orders );
         $page_title  = $doc_title . ' #' . $first_order->get_order_number();
@@ -156,17 +158,17 @@ class WC_JIR_Invoice_Renderer {
             padding: 1mm 0;
         }
 
-        <?php if ( $watermark ) : ?>
+        <?php if ( $watermark_enabled && ! empty( $watermark_url ) ) : ?>
         .inv-copy::before {
             content: "";
             position: absolute;
             top: 52%;
             left: 50%;
-            width: 110mm;
-            height: 110mm;
+            width: 120mm;
+            height: 120mm;
             transform: translate(-50%, -50%);
-            background: url('<?php echo esc_url( $logo_url ); ?>') center / contain no-repeat;
-            opacity: 0.04;
+            background: url('<?php echo esc_url( $watermark_url ); ?>') center / contain no-repeat;
+            opacity: <?php echo esc_attr( $watermark_opacity ); ?>;
             z-index: -1;
             pointer-events: none;
         }

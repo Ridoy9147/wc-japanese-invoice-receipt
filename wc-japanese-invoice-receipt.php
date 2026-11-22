@@ -3,7 +3,7 @@
  * Plugin Name: WooCommerce Japanese Invoice & Receipt (納品書・領収書印刷)
  * Plugin URI: https://github.com/Ridoy9147/wc-japanese-invoice-receipt
  * Description: A lightweight, elegant Japanese A4 printable & PDF invoice and receipt system (納品書兼領収書) for WooCommerce orders. Compliant with the Japanese Qualified Invoice System (インボイス制度 - 適格請求書), featuring dual-copy (店舗控え & お客様控え) with cut line, dynamic logo watermarking, sticky print toolbar, bulk printing, and zero external PDF dependencies.
- * Version: 1.0.0
+ * Version: 1.0.1
  * Author: Developer Hridoy
  * Author URI: https://github.com/Ridoy9147
  * Text Domain: wc-japanese-invoice-receipt
@@ -20,7 +20,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'WC_JIR_VERSION', '1.0.0' );
+define( 'WC_JIR_VERSION', '1.0.1' );
 define( 'WC_JIR_FILE', __FILE__ );
 define( 'WC_JIR_PATH', plugin_dir_path( __FILE__ ) );
 define( 'WC_JIR_URL', plugin_dir_url( __FILE__ ) );
