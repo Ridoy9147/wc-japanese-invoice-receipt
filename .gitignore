@@ -1,0 +1,13 @@
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Archives
+*.zip
+*.tar.gz
+
+# Vendor / IDE
+node_modules/
+vendor/
+.idea/
+.vscode/
